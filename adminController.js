@@ -1,0 +1,6 @@
+PORT=3001
+JWT_SECRET=okulgiris_super_secret_jwt_key_2026_change_in_production
+JWT_EXPIRES_IN=8h
+ADMIN_DEFAULT_USER=admin
+ADMIN_DEFAULT_PASS=Admin2026!
+NODE_ENV=development
