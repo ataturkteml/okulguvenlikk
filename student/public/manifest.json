@@ -1,0 +1,15 @@
+{
+  "short_name": "OkulGiriş",
+  "name": "Okul Giriş Çıkış ve Bildirim Sistemi",
+  "icons": [
+    { "src": "icons/icon-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any maskable" },
+    { "src": "icons/icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any maskable" }
+  ],
+  "start_url": "/student/index.html",
+  "scope": "/student/",
+  "background_color": "#f0f4ff",
+  "theme_color": "#1e40af",
+  "display": "standalone",
+  "orientation": "portrait",
+  "lang": "tr"
+}

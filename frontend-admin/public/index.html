@@ -1,0 +1,1636 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>OkulGiriş — Admin Paneli</title>
+  <!-- QR Code üretici -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <!-- Socket.io -->
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --primary-light: #3b82f6;
+      --sidebar-bg: #0f172a;
+      --sidebar-hover: #1e293b;
+      --sidebar-active: #1d4ed8;
+      --bg: #f1f5f9;
+      --card: #ffffff;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --success: #10b981;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --info: #0ea5e9;
+      --radius: 12px;
+      --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.05);
+    }
+
+    html, body { height: 100%; overflow: hidden; font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+
+    /* ─── LAYOUT ─── */
+    #app { display: flex; height: 100vh; }
+
+    /* ─── SIDEBAR ─── */
+    .sidebar {
+      width: 240px;
+      background: var(--sidebar-bg);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      overflow-y: auto;
+    }
+
+    .sidebar-logo {
+      padding: 24px 20px 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    .sidebar-logo h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      color: white;
+      letter-spacing: -0.3px;
+    }
+    .sidebar-logo p {
+      font-size: 11px;
+      color: rgba(255,255,255,0.4);
+      margin-top: 3px;
+      font-weight: 500;
+    }
+
+    .sidebar-nav {
+      flex: 1;
+      padding: 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .nav-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: rgba(255,255,255,0.25);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      padding: 12px 8px 6px;
+    }
+
+    .nav-link {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      color: rgba(255,255,255,0.55);
+      cursor: pointer;
+      transition: all 0.15s;
+      font-size: 13px;
+      font-weight: 600;
+      border: none;
+      background: none;
+      width: 100%;
+      text-align: left;
+    }
+    .nav-link:hover { background: var(--sidebar-hover); color: rgba(255,255,255,0.85); }
+    .nav-link.active { background: var(--sidebar-active); color: white; }
+    .nav-link svg { flex-shrink: 0; }
+
+    .live-dot {
+      width: 7px; height: 7px;
+      background: #4ade80;
+      border-radius: 50%;
+      animation: blink 1.5s infinite;
+      margin-left: auto;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    .sidebar-footer {
+      padding: 16px 12px;
+      border-top: 1px solid rgba(255,255,255,0.07);
+    }
+    .admin-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px;
+    }
+    .admin-avatar {
+      width: 34px; height: 34px;
+      background: var(--primary);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 700;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    .admin-info-text { flex: 1; min-width: 0; }
+    .admin-info-text p { font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.8); }
+    .admin-info-text span { font-size: 11px; color: rgba(255,255,255,0.35); }
+
+    .btn-logout-admin {
+      width: 100%;
+      margin-top: 8px;
+      padding: 8px;
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.2);
+      border-radius: 8px;
+      color: #f87171;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background 0.15s;
+    }
+    .btn-logout-admin:hover { background: rgba(239,68,68,0.2); }
+
+    /* ─── MAIN CONTENT ─── */
+    .main-content {
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar {
+      background: white;
+      border-bottom: 1px solid var(--border);
+      padding: 0 28px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .topbar h2 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .topbar-right { display: flex; align-items: center; gap: 12px; }
+
+    .badge-online {
+      background: #dcfce7;
+      color: #166534;
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .badge-online::before {
+      content: '';
+      width: 7px; height: 7px;
+      background: #16a34a;
+      border-radius: 50%;
+    }
+
+    .content-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 28px;
+    }
+
+    /* ─── PANELS ─── */
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* ─── DASHBOARD ─── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: white;
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: var(--shadow);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .stat-icon {
+      width: 48px; height: 48px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .stat-icon.blue { background: #eff6ff; }
+    .stat-icon.green { background: #f0fdf4; }
+    .stat-icon.gray { background: #f8fafc; }
+    .stat-icon.orange { background: #fff7ed; }
+    .stat-icon.red { background: #fef2f2; }
+
+    .stat-info h3 {
+      font-size: 26px;
+      font-weight: 800;
+      line-height: 1;
+      color: var(--text);
+    }
+    .stat-info p {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      font-weight: 500;
+    }
+
+    .section-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* ─── CARDS ─── */
+    .card {
+      background: white;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .card-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .card-header h3 { font-size: 14px; font-weight: 700; }
+    .card-body { padding: 20px; }
+
+    /* ─── TABLE ─── */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      background: #f8fafc;
+      padding: 11px 16px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border);
+    }
+    tbody td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      vertical-align: middle;
+    }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: #f8fafc; }
+
+    /* ─── BADGES ─── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .badge-success { background: #dcfce7; color: #166534; }
+    .badge-default { background: #f1f5f9; color: #475569; }
+    .badge-danger { background: #fee2e2; color: #991b1b; }
+    .badge-info { background: #e0f2fe; color: #0369a1; }
+
+    .badge-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+    }
+    .badge-success .badge-dot { background: #16a34a; }
+    .badge-default .badge-dot { background: #94a3b8; }
+    .badge-danger .badge-dot { background: #dc2626; }
+
+    /* ─── BUTTONS ─── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-success { background: var(--success); color: white; }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-danger:hover { background: #dc2626; }
+    .btn-outline { background: white; color: var(--text); border: 1px solid var(--border); }
+    .btn-outline:hover { background: #f8fafc; }
+    .btn-sm { padding: 5px 10px; font-size: 12px; }
+    .btn-icon { padding: 6px; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    /* ─── FORMS ─── */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-group.full { grid-column: 1 / -1; }
+    label { font-size: 12px; font-weight: 700; color: var(--text-muted); }
+    input[type=text], input[type=password], input[type=number], textarea, select {
+      padding: 10px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      font-size: 13px;
+      font-family: 'Inter', sans-serif;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      background: white;
+      color: var(--text);
+    }
+    input:focus, textarea:focus, select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+    }
+    textarea { resize: vertical; min-height: 100px; }
+
+    .form-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
+
+    /* ─── LIVE FEED ─── */
+    .live-feed {
+      max-height: 420px;
+      overflow-y: auto;
+    }
+
+    .live-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border);
+      animation: slideIn 0.3s ease;
+    }
+    .live-item:last-child { border-bottom: none; }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .live-avatar {
+      width: 38px; height: 38px;
+      border-radius: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      flex-shrink: 0;
+      color: white;
+    }
+    .live-avatar.giris { background: linear-gradient(135deg, #059669, #10b981); }
+    .live-avatar.cikis { background: linear-gradient(135deg, #dc2626, #ef4444); }
+
+    .live-info { flex: 1; min-width: 0; }
+    .live-info strong { font-size: 13px; font-weight: 700; display: block; }
+    .live-info span { font-size: 11px; color: var(--text-muted); }
+
+    .live-time { font-size: 11px; color: var(--text-muted); white-space: nowrap; font-weight: 600; }
+
+    /* ─── SEARCH ─── */
+    .search-bar {
+      position: relative;
+      flex: 1;
+    }
+    .search-bar input { width: 100%; padding-left: 36px; }
+    .search-bar svg {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+    }
+
+    /* ─── TOOLBAR ─── */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    /* ─── MODALS ─── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 500;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(3px);
+    }
+    .modal-overlay.show { display: flex; }
+
+    .modal {
+      background: white;
+      border-radius: 16px;
+      width: 90%;
+      max-width: 520px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    }
+    .modal-header {
+      padding: 20px 24px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .modal-header h3 { font-size: 16px; font-weight: 700; }
+    .modal-close {
+      background: none; border: none; cursor: pointer;
+      color: var(--text-muted); padding: 4px; border-radius: 6px;
+      transition: background 0.15s;
+    }
+    .modal-close:hover { background: var(--bg); }
+    .modal-body { padding: 24px; }
+    .modal-footer { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; }
+
+    /* ─── ALERT ─── */
+    .alert {
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .alert.show { display: block; }
+    .alert-success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    .alert-error { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+
+    /* ─── QR MODAL ─── */
+    #qr-display { display: flex; justify-content: center; margin: 16px 0; }
+    #qr-code-canvas { border-radius: 12px; }
+    .barkod-text {
+      text-align: center;
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: var(--text);
+      margin-top: 12px;
+      font-family: monospace;
+    }
+
+    /* ─── EMPTY ─── */
+    .empty-row td {
+      text-align: center;
+      padding: 40px;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    /* ─── SCROLL ─── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
+    /* ─── SPINNER ─── */
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: inline-block;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── NOTIFICATIONS LIST ─── */
+    .notif-item {
+      display: flex;
+      gap: 14px;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .notif-item:last-child { border-bottom: none; }
+    .notif-body { flex: 1; }
+    .notif-body h4 { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+    .notif-body p { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+    .notif-meta { font-size: 11px; color: var(--text-muted); margin-top: 6px; font-weight: 500; }
+
+    /* ─── RESPONSIVE ─── */
+    @media (max-width: 900px) {
+      .sidebar { width: 60px; }
+      .sidebar-logo h1, .sidebar-logo p, .nav-link span, .nav-label, .admin-info-text, .btn-logout-admin span, .live-dot { display: none; }
+      .nav-link { justify-content: center; padding: 10px; }
+      .nav-link svg { margin: 0; }
+      .admin-info { justify-content: center; }
+      .admin-info-text { display: none; }
+      .form-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ══ LOGIN OVERLAY ══ -->
+  <div id="login-overlay" style="position:fixed;inset:0;background:linear-gradient(145deg,#0f172a,#1e3a8a);display:flex;align-items:center;justify-content:center;z-index:999">
+    <div style="background:white;border-radius:20px;padding:40px 36px;width:360px;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+      <div style="text-align:center;margin-bottom:28px">
+        <div style="width:60px;height:60px;background:linear-gradient(135deg,#1e40af,#3b82f6);border-radius:16px;display:inline-flex;align-items:center;justify-content:center;margin-bottom:14px">
+          <svg width="30" height="30" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+          </svg>
+        </div>
+        <h1 style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;color:#0f172a">Admin Paneli</h1>
+        <p style="font-size:13px;color:#64748b;margin-top:4px">OkulGiriş Yönetim Sistemi</p>
+      </div>
+      <div id="admin-login-error" class="alert alert-error"></div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <input type="text" id="admin-user" placeholder="Kullanıcı Adı" autocomplete="username" style="padding:12px 16px"/>
+        <input type="password" id="admin-pass" placeholder="Şifre" autocomplete="current-password" style="padding:12px 16px"/>
+        <button id="admin-login-btn" onclick="doAdminLogin()" style="padding:13px;background:linear-gradient(135deg,#1e40af,#3b82f6);color:white;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;transition:opacity 0.15s">
+          Giriş Yap
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ SIDEBAR ══ -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <h1>🏫 OkulGiriş</h1>
+      <p>Admin Paneli</p>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-label">Genel</div>
+      <button class="nav-link active" onclick="showPanel('dashboard', this)">
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
+        </svg>
+        <span>Dashboard</span>
+      </button>
+
+      <div class="nav-label">Yönetim</div>
+      <button class="nav-link" onclick="showPanel('students', this)">
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+        <span>Öğrenci Yönetimi</span>
+      </button>
+
+      <button class="nav-link" onclick="showPanel('live', this)">
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H4a2 2 0 01-2-2V5a2 2 0 012-2h16a2 2 0 012 2v10a2 2 0 01-2 2h-1"/>
+        </svg>
+        <span>Canlı Takip</span>
+        <div class="live-dot"></div>
+      </button>
+
+      <button class="nav-link" onclick="showPanel('logs', this)">
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+        </svg>
+        <span>Tüm Loglar</span>
+      </button>
+
+      <button class="nav-link" onclick="showPanel('notifications', this)">
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+        </svg>
+        <span>Bildirim Merkezi</span>
+      </button>
+
+      <button class="nav-link" onclick="window.open('/admin/guvenlikci.html','_blank')">
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+        </svg>
+        <span>Güvenlikçi Ekranı</span>
+      </button>
+      <div class="nav-label">Hesap</div>
+      <button class="nav-link" onclick="showPanel('settings', this)">
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+        <span>Ayarlar</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="admin-info">
+        <div class="admin-avatar" id="admin-avatar-letter">A</div>
+        <div class="admin-info-text">
+          <p id="sidebar-admin-name">Admin</p>
+          <span>Yönetici</span>
+        </div>
+      </div>
+      <button class="btn-logout-admin" onclick="doAdminLogout()">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7"/>
+        </svg>
+        <span>Çıkış Yap</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ══ MAIN ══ -->
+  <div class="main-content">
+    <div class="topbar">
+      <h2 id="topbar-title">Dashboard</h2>
+      <div class="topbar-right">
+        <div class="badge-online" id="socket-status">Bağlı</div>
+      </div>
+    </div>
+
+    <div class="content-area">
+
+      <!-- ── DASHBOARD ── -->
+      <div class="panel active" id="panel-dashboard">
+        <div class="stats-grid" id="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon green"><svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#059669" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg></div>
+            <div class="stat-info"><h3 id="stat-okulda">—</h3><p>Okulda</p></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon gray"><svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#94a3b8" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7"/></svg></div>
+            <div class="stat-info"><h3 id="stat-disarida">—</h3><p>Dışarıda</p></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon blue"><svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#2563eb" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg></div>
+            <div class="stat-info"><h3 id="stat-toplam">—</h3><p>Toplam Öğrenci</p></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon orange"><svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#f59e0b" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
+            <div class="stat-info"><h3 id="stat-bugun">—</h3><p>Bugün Giriş</p></div>
+          </div>
+        </div>
+
+        <div class="section-title">📋 Son İşlemler</div>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Öğrenci</th>
+                  <th>No</th>
+                  <th>İşlem</th>
+                  <th>Tarih / Saat</th>
+                </tr>
+              </thead>
+              <tbody id="dashboard-log-tbody">
+                <tr class="empty-row"><td colspan="4">Yükleniyor...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── STUDENTS ── -->
+      <div class="panel" id="panel-students">
+        <div class="toolbar">
+          <div class="search-bar">
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+            <input type="text" id="student-search" placeholder="Ad veya öğrenci no ile ara..." oninput="filterStudents()"/>
+          </div>
+          <select id="student-filter-status" onchange="filterStudents()" style="padding:9px 14px;min-width:140px">
+            <option value="">Tüm Durumlar</option>
+            <option value="OKULDA">Okulda</option>
+            <option value="DISARIDA">Dışarıda</option>
+          </select>
+          <button class="btn btn-primary" onclick="openAddModal()">
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+            Öğrenci Ekle
+          </button>
+        </div>
+
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Ad Soyad</th>
+                  <th>Öğrenci No</th>
+                  <th>Sınıf</th>
+                  <th>Barkod</th>
+                  <th>Durum</th>
+                  <th>Kayıt Tarihi</th>
+                  <th>İşlemler</th>
+                </tr>
+              </thead>
+              <tbody id="students-tbody">
+                <tr class="empty-row"><td colspan="6">Yükleniyor...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── LIVE ── -->
+      <div class="panel" id="panel-live">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+          <div class="stat-card">
+            <div class="stat-icon green"><svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#059669" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg></div>
+            <div class="stat-info"><h3 id="live-okulda">—</h3><p>Şu an Okulda</p></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon red"><svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#ef4444" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7"/></svg></div>
+            <div class="stat-info"><h3 id="live-disarida">—</h3><p>Şu an Dışarıda</p></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>🔴 Canlı Giriş-Çıkış Akışı</h3>
+            <button class="btn btn-outline btn-sm" onclick="clearLiveFeed()">Temizle</button>
+          </div>
+          <div class="live-feed" id="live-feed">
+            <div style="text-align:center;padding:40px;color:var(--text-muted)">
+              <div style="font-size:36px;margin-bottom:12px">📡</div>
+              <p style="font-size:13px">WebSocket bekleniyor...<br/>Öğrenciler giriş-çıkış yaptıkça burada görünecek.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── LOGS ── -->
+      <div class="panel" id="panel-logs">
+        <div class="toolbar">
+          <select id="log-filter" onchange="loadLogs()" style="padding:9px 14px">
+            <option value="">Tüm İşlemler</option>
+            <option value="GİRİŞ">Sadece Girişler</option>
+            <option value="ÇIKIŞ">Sadece Çıkışlar</option>
+          </select>
+          <button class="btn btn-outline" onclick="loadLogs()">
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            Yenile
+          </button>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Öğrenci</th>
+                  <th>No</th>
+                  <th>İşlem</th>
+                  <th>Tarih / Saat</th>
+                </tr>
+              </thead>
+              <tbody id="logs-tbody">
+                <tr class="empty-row"><td colspan="5">Yükleniyor...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── NOTIFICATIONS ── -->
+      <div class="panel" id="panel-notifications">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+          <div>
+            <div class="section-title">✉️ Yeni Bildirim Gönder</div>
+            <div class="card card-body">
+              <div id="notif-alert" class="alert"></div>
+              <div class="form-group" style="margin-bottom:14px">
+                <label>Başlık</label>
+                <input type="text" id="notif-baslik" placeholder="Bildirim başlığı"/>
+              </div>
+              <div class="form-group" style="margin-bottom:14px">
+                <label>İçerik</label>
+                <textarea id="notif-icerik" placeholder="Bildirim içeriği..."></textarea>
+              </div>
+              <div class="form-group" style="margin-bottom:14px">
+                <label>Gönderim Türü</label>
+                <select id="notif-tur" onchange="toggleStudentSelect()">
+                  <option value="genel">Tüm Okul (Genel)</option>
+                  <option value="ozel">Özel Öğrenci</option>
+                </select>
+              </div>
+              <div class="form-group" id="ozel-ogrenci-group" style="margin-bottom:14px;display:none">
+                <label>Öğrenci Seç</label>
+                <select id="notif-ogrenci-id">
+                  <option value="">Öğrenci seçin...</option>
+                </select>
+              </div>
+              <button class="btn btn-primary" onclick="gonderimiGonder()" style="width:100%">
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                Gönder
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <div class="section-title">📋 Gönderilen Bildirimler</div>
+            <div class="card">
+              <div id="sent-notifs" style="max-height:460px;overflow-y:auto">
+                <div style="text-align:center;padding:40px;color:var(--text-muted);font-size:13px">Yükleniyor...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── SETTINGS ── -->
+      <div class="panel" id="panel-settings">
+        <div style="max-width:480px">
+          <div class="section-title">🔐 Şifre Değiştir</div>
+          <div class="card card-body">
+            <div id="settings-alert" class="alert"></div>
+            <div class="form-group" style="margin-bottom:14px">
+              <label>Mevcut Şifre</label>
+              <input type="password" id="eski-sifre" placeholder="Mevcut şifreniz"/>
+            </div>
+            <div class="form-group" style="margin-bottom:14px">
+              <label>Yeni Şifre</label>
+              <input type="password" id="yeni-sifre" placeholder="En az 6 karakter"/>
+            </div>
+            <div class="form-group" style="margin-bottom:20px">
+              <label>Yeni Şifre (Tekrar)</label>
+              <input type="password" id="yeni-sifre2" placeholder="Yeni şifreyi tekrar girin"/>
+            </div>
+            <button class="btn btn-primary" onclick="sifreDegistir()">Şifreyi Güncelle</button>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content-area -->
+  </div><!-- /main-content -->
+</div><!-- /app -->
+
+<!-- ══ MODALS ══ -->
+
+<!-- Öğrenci Ekle Modal -->
+<div class="modal-overlay" id="modal-add-student">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>➕ Yeni Öğrenci Ekle</h3>
+      <button class="modal-close" onclick="closeModal('modal-add-student')">
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div id="add-student-alert" class="alert"></div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Öğrenci No *</label>
+          <input type="text" id="new-ogrenci-no" placeholder="Örn: 2026001" inputmode="numeric"/>
+        </div>
+        <div class="form-group">
+          <label>Ad Soyad *</label>
+          <input type="text" id="new-ad-soyad" placeholder="Ahmet Yılmaz"/>
+        </div>
+        <div class="form-group">
+          <label>Şifre *</label>
+          <input type="password" id="new-sifre" placeholder="En az 4 karakter"/>
+        </div>
+        <div class="form-group">
+          <label>Sınıf (Opsiyonel)</label>
+          <input type="text" id="new-sinif" placeholder="Örn: 10-A, 9-B"/>
+        </div>
+        <div class="form-group">
+          <label>Barkod (Otomatik)</label>
+          <input type="text" id="new-barkod-preview" placeholder="OKL-YYYY-XXXX" readonly style="background:#f8fafc;color:#64748b"/>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-add-student')">İptal</button>
+      <button class="btn btn-primary" id="add-student-btn" onclick="addStudent()">
+        <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+        Kaydet
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Öğrenci Düzenle Modal -->
+<div class="modal-overlay" id="modal-edit-student">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>✏️ Öğrenci Düzenle</h3>
+      <button class="modal-close" onclick="closeModal('modal-edit-student')">
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div id="edit-student-alert" class="alert"></div>
+      <input type="hidden" id="edit-student-id"/>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Öğrenci No (Değiştirilemez)</label>
+          <input type="text" id="edit-ogrenci-no" readonly style="background:#f8fafc;color:#64748b"/>
+        </div>
+        <div class="form-group">
+          <label>Ad Soyad</label>
+          <input type="text" id="edit-ad-soyad" placeholder="Ad Soyad"/>
+        </div>
+        <div class="form-group full">
+          <label>Yeni Şifre (boş bırakılırsa değişmez)</label>
+          <input type="password" id="edit-sifre" placeholder="Yeni şifre (opsiyonel)"/>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-edit-student')">İptal</button>
+      <button class="btn btn-primary" onclick="updateStudent()">Güncelle</button>
+    </div>
+  </div>
+</div>
+
+<!-- QR Görüntüle Modal -->
+<div class="modal-overlay" id="modal-qr">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header">
+      <h3>🔲 Öğrenci Barkodu</h3>
+      <button class="modal-close" onclick="closeModal('modal-qr')">
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" style="text-align:center">
+      <p id="qr-student-name" style="font-size:15px;font-weight:700;margin-bottom:4px"></p>
+      <p id="qr-student-no" style="font-size:13px;color:var(--text-muted);margin-bottom:16px"></p>
+      <div id="qr-display"></div>
+      <p class="barkod-text" id="qr-barkod-text"></p>
+      <p style="font-size:11px;color:var(--text-muted);margin-top:12px">Bu QR kodu ekran görüntüsü alarak yazdırabilirsiniz.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="printQR()">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+        Yazdır
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Silme Onay Modal -->
+<div class="modal-overlay" id="modal-confirm-delete">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-body" style="text-align:center;padding:36px 24px">
+      <div style="font-size:52px;margin-bottom:16px">⚠️</div>
+      <h3 style="font-size:18px;font-weight:700;margin-bottom:10px">Öğrenciyi Sil</h3>
+      <p style="color:var(--text-muted);font-size:14px;margin-bottom:24px" id="confirm-delete-msg">Bu öğrenciyi ve tüm giriş-çıkış kayıtlarını silmek istediğinize emin misiniz?</p>
+      <div style="display:flex;gap:12px;justify-content:center">
+        <button class="btn btn-outline" onclick="closeModal('modal-confirm-delete')">İptal</button>
+        <button class="btn btn-danger" id="confirm-delete-btn">Evet, Sil</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════
+// STATE
+// ══════════════════════════════════════
+let adminToken = localStorage.getItem('admin_token');
+let adminInfo = JSON.parse(localStorage.getItem('admin_info') || 'null');
+let allStudents = [];
+let socket = null;
+let liveEmpty = true;
+
+// ══════════════════════════════════════
+// INIT
+// ══════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  if (adminToken && adminInfo) {
+    showAdminApp();
+  }
+
+  document.getElementById('admin-pass').addEventListener('keypress', e => {
+    if (e.key === 'Enter') doAdminLogin();
+  });
+  document.getElementById('admin-user').addEventListener('keypress', e => {
+    if (e.key === 'Enter') document.getElementById('admin-pass').focus();
+  });
+
+  // Barkod önizleme
+  document.getElementById('new-ogrenci-no').addEventListener('input', e => {
+    const no = e.target.value.trim();
+    document.getElementById('new-barkod-preview').value = no ? `OKL-${new Date().getFullYear()}-${no.padStart(4, '0')}` : '';
+  });
+});
+
+// ══════════════════════════════════════
+// AUTH
+// ══════════════════════════════════════
+async function doAdminLogin() {
+  const user = document.getElementById('admin-user').value.trim();
+  const pass = document.getElementById('admin-pass').value;
+  const btn = document.getElementById('admin-login-btn');
+  const err = document.getElementById('admin-login-error');
+
+  if (!user || !pass) {
+    err.textContent = 'Kullanıcı adı ve şifre giriniz.';
+    err.classList.add('show');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Giriş yapılıyor...';
+
+  try {
+    const res = await apiFetch('/api/auth/admin-login', 'POST', { kullanici_adi: user, sifre: pass }, false);
+    if (!res.success) {
+      err.textContent = res.message;
+      err.classList.add('show');
+      btn.disabled = false;
+      btn.textContent = 'Giriş Yap';
+      return;
+    }
+
+    adminToken = res.token;
+    adminInfo = res.admin;
+    localStorage.setItem('admin_token', adminToken);
+    localStorage.setItem('admin_info', JSON.stringify(adminInfo));
+    showAdminApp();
+  } catch {
+    err.textContent = 'Sunucuya bağlanılamadı.';
+    err.classList.add('show');
+    btn.disabled = false;
+    btn.textContent = 'Giriş Yap';
+  }
+}
+
+function showAdminApp() {
+  document.getElementById('login-overlay').style.display = 'none';
+  document.getElementById('sidebar-admin-name').textContent = adminInfo.kullanici_adi;
+  document.getElementById('admin-avatar-letter').textContent = adminInfo.kullanici_adi[0].toUpperCase();
+  connectSocket();
+  loadDashboard();
+  loadStudents();
+}
+
+function doAdminLogout() {
+  if (socket) socket.disconnect();
+  localStorage.removeItem('admin_token');
+  localStorage.removeItem('admin_info');
+  adminToken = null;
+  adminInfo = null;
+  document.getElementById('login-overlay').style.display = 'flex';
+  document.getElementById('admin-user').value = '';
+  document.getElementById('admin-pass').value = '';
+  document.getElementById('admin-login-error').classList.remove('show');
+  document.getElementById('admin-login-btn').disabled = false;
+  document.getElementById('admin-login-btn').textContent = 'Giriş Yap';
+}
+
+// ══════════════════════════════════════
+// API
+// ══════════════════════════════════════
+async function apiFetch(url, method = 'GET', body = null, auth = true) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (auth && adminToken) headers['Authorization'] = `Bearer ${adminToken}`;
+
+  const opts = { method, headers };
+  if (body) opts.body = JSON.stringify(body);
+
+  const res = await fetch(url, opts);
+  const data = await res.json();
+
+  if (res.status === 401) {
+    doAdminLogout();
+    return { success: false, message: 'Oturum sona erdi.' };
+  }
+  return data;
+}
+
+// ══════════════════════════════════════
+// PANELS
+// ══════════════════════════════════════
+const panelTitles = {
+  dashboard: 'Dashboard',
+  students: 'Öğrenci Yönetimi',
+  live: 'Canlı Takip',
+  logs: 'Tüm Loglar',
+  notifications: 'Bildirim Merkezi',
+  settings: 'Ayarlar',
+};
+
+function showPanel(name, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+
+  document.getElementById(`panel-${name}`).classList.add('active');
+  if (btn) btn.classList.add('active');
+  document.getElementById('topbar-title').textContent = panelTitles[name] || name;
+
+  if (name === 'dashboard') loadDashboard();
+  else if (name === 'students') loadStudents();
+  else if (name === 'logs') loadLogs();
+  else if (name === 'notifications') loadNotifications();
+  else if (name === 'live') refreshLiveStats();
+}
+
+// ══════════════════════════════════════
+// DASHBOARD
+// ══════════════════════════════════════
+async function loadDashboard() {
+  try {
+    const data = await apiFetch('/api/admin/dashboard');
+    if (!data.success) return;
+
+    document.getElementById('stat-okulda').textContent = data.stats.okulda;
+    document.getElementById('stat-disarida').textContent = data.stats.disarida;
+    document.getElementById('stat-toplam').textContent = data.stats.toplam;
+    document.getElementById('stat-bugun').textContent = data.stats.bugunGiris;
+    document.getElementById('live-okulda').textContent = data.stats.okulda;
+    document.getElementById('live-disarida').textContent = data.stats.disarida;
+
+    const tbody = document.getElementById('dashboard-log-tbody');
+    if (!data.sonIslemler.length) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="4">Henüz kayıt yok</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.sonIslemler.map(l => `
+      <tr>
+        <td><strong>${escHtml(l.ad_soyad)}</strong></td>
+        <td>${escHtml(l.ogrenci_no)}</td>
+        <td>${logBadge(l.islem_turu)}</td>
+        <td>${formatDate(l.tarih_saat)}</td>
+      </tr>
+    `).join('');
+  } catch {}
+}
+
+// ══════════════════════════════════════
+// STUDENTS
+// ══════════════════════════════════════
+async function loadStudents() {
+  try {
+    const data = await apiFetch('/api/admin/ogrenciler');
+    if (!data.success) return;
+    allStudents = data.ogrenciler;
+    renderStudents(allStudents);
+    populateStudentSelect(allStudents);
+  } catch {}
+}
+
+function renderStudents(list) {
+  const tbody = document.getElementById('students-tbody');
+  if (!list.length) {
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Öğrenci bulunamadı</td></tr>';
+    return;
+  }
+  tbody.innerHTML = list.map(s => `
+    <tr>
+      <td><strong>${escHtml(s.ad_soyad)}</strong></td>
+      <td><code style="background:#f1f5f9;padding:2px 8px;border-radius:5px;font-size:12px">${escHtml(s.ogrenci_no)}</code></td>
+      <td><code style="font-size:11px;color:#64748b">${escHtml(s.barkod_veri)}</code></td>
+      <td>${s.durum === 'OKULDA'
+        ? '<span class="badge badge-success"><span class="badge-dot"></span>Okulda</span>'
+        : '<span class="badge badge-default"><span class="badge-dot"></span>Dışarıda</span>'}</td>
+      <td>${formatDateShort(s.olusturma_tarihi)}</td>
+      <td>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-outline btn-sm btn-icon" onclick="showQR(${JSON.stringify(s).replace(/"/g,'&quot;')})" title="QR Görüntüle">
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
+          </button>
+          <button class="btn btn-outline btn-sm btn-icon" onclick="openEditModal(${JSON.stringify(s).replace(/"/g,'&quot;')})" title="Düzenle">
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+          </button>
+          <button class="btn btn-danger btn-sm btn-icon" onclick="confirmDelete(${s.id}, '${escHtml(s.ad_soyad)}')" title="Sil">
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          </button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function filterStudents() {
+  const search = document.getElementById('student-search').value.toLowerCase();
+  const status = document.getElementById('student-filter-status').value;
+  const filtered = allStudents.filter(s => {
+    const matchSearch = s.ad_soyad.toLowerCase().includes(search) || s.ogrenci_no.includes(search);
+    const matchStatus = !status || s.durum === status;
+    return matchSearch && matchStatus;
+  });
+  renderStudents(filtered);
+}
+
+function openAddModal() {
+  document.getElementById('new-ogrenci-no').value = '';
+  document.getElementById('new-ad-soyad').value = '';
+  document.getElementById('new-sifre').value = '';
+    document.getElementById('new-sinif').value = '';
+  document.getElementById('new-barkod-preview').value = '';
+  document.getElementById('add-student-alert').classList.remove('show');
+  openModal('modal-add-student');
+}
+
+async function addStudent() {
+  const no = document.getElementById('new-ogrenci-no').value.trim();
+  const ad = document.getElementById('new-ad-soyad').value.trim();
+  const sinif = document.getElementById('new-sinif').value.trim();
+  const sifre = document.getElementById('new-sifre').value;
+  const alertEl = document.getElementById('add-student-alert');
+  const btn = document.getElementById('add-student-btn');
+
+  if (!no || !ad || !sifre) {
+    showAlert(alertEl, 'Tüm alanları doldurunuz.', 'error');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  try {
+    const data = await apiFetch('/api/admin/ogrenci-ekle', 'POST', { ogrenci_no: no, ad_soyad: ad, sifre });
+    if (!data.success) {
+      showAlert(alertEl, data.message, 'error');
+      btn.disabled = false;
+      btn.textContent = 'Kaydet';
+      return;
+    }
+    closeModal('modal-add-student');
+    await loadStudents();
+    loadDashboard();
+  } catch {
+    showAlert(alertEl, 'Sunucu hatası.', 'error');
+    btn.disabled = false;
+    btn.textContent = 'Kaydet';
+  }
+}
+
+function openEditModal(s) {
+  document.getElementById('edit-student-id').value = s.id;
+  document.getElementById('edit-ogrenci-no').value = s.ogrenci_no;
+  document.getElementById('edit-ad-soyad').value = s.ad_soyad;
+  document.getElementById('edit-sifre').value = '';
+  document.getElementById('edit-student-alert').classList.remove('show');
+  openModal('modal-edit-student');
+}
+
+async function updateStudent() {
+  const id = document.getElementById('edit-student-id').value;
+  const ad = document.getElementById('edit-ad-soyad').value.trim();
+  const sifre = document.getElementById('edit-sifre').value;
+  const alertEl = document.getElementById('edit-student-alert');
+
+  if (!ad) { showAlert(alertEl, 'Ad soyad boş olamaz.', 'error'); return; }
+
+  const body = { ad_soyad: ad };
+  if (sifre) body.sifre = sifre;
+
+  try {
+    const data = await apiFetch(`/api/admin/ogrenciler/${id}`, 'PUT', body);
+    if (!data.success) { showAlert(alertEl, data.message, 'error'); return; }
+    closeModal('modal-edit-student');
+    await loadStudents();
+  } catch {
+    showAlert(alertEl, 'Sunucu hatası.', 'error');
+  }
+}
+
+function confirmDelete(id, ad) {
+  document.getElementById('confirm-delete-msg').textContent = `"${ad}" adlı öğrenciyi ve tüm kayıtlarını silmek istediğinize emin misiniz?`;
+  const btn = document.getElementById('confirm-delete-btn');
+  btn.onclick = () => deleteStudent(id);
+  openModal('modal-confirm-delete');
+}
+
+async function deleteStudent(id) {
+  try {
+    const data = await apiFetch(`/api/admin/ogrenciler/${id}`, 'DELETE');
+    closeModal('modal-confirm-delete');
+    if (data.success) {
+      await loadStudents();
+      loadDashboard();
+    }
+  } catch {}
+}
+
+// ══════════════════════════════════════
+// QR
+// ══════════════════════════════════════
+function showQR(s) {
+  document.getElementById('qr-student-name').textContent = s.ad_soyad;
+  document.getElementById('qr-student-no').textContent = `Öğrenci No: ${s.ogrenci_no}`;
+  document.getElementById('qr-barkod-text').textContent = s.barkod_veri;
+  document.getElementById('qr-display').innerHTML = '';
+
+  setTimeout(() => {
+    new QRCode(document.getElementById('qr-display'), {
+      text: s.barkod_veri,
+      width: 220,
+      height: 220,
+      colorDark: '#0f172a',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.H
+    });
+  }, 100);
+
+  openModal('modal-qr');
+}
+
+function printQR() {
+  const canvas = document.querySelector('#qr-display canvas');
+  if (!canvas) return;
+  const win = window.open('', '_blank');
+  const name = document.getElementById('qr-student-name').textContent;
+  const no = document.getElementById('qr-student-no').textContent;
+  const barkod = document.getElementById('qr-barkod-text').textContent;
+  win.document.write(`
+    <html><head><title>QR - ${name}</title><style>
+      body{font-family:Arial,sans-serif;text-align:center;padding:40px}
+      img{display:block;margin:0 auto 16px}
+      h2{font-size:20px;margin-bottom:4px}
+      p{color:#64748b;margin-bottom:4px;font-size:14px}
+      .code{font-family:monospace;font-size:16px;font-weight:bold;margin-top:12px;letter-spacing:2px}
+    </style></head>
+    <body>
+      <img src="${canvas.toDataURL()}" width="220"/>
+      <h2>${name}</h2>
+      <p>${no}</p>
+      <div class="code">${barkod}</div>
+      <script>window.onload=()=>{window.print();window.close()}<\/script>
+    </body></html>
+  `);
+  win.document.close();
+}
+
+// ══════════════════════════════════════
+// LOGS
+// ══════════════════════════════════════
+async function loadLogs() {
+  const filtre = document.getElementById('log-filter').value;
+  let url = '/api/admin/loglar?limit=200';
+  if (filtre) url += `&filtre=${encodeURIComponent(filtre)}`;
+
+  try {
+    const data = await apiFetch(url);
+    const tbody = document.getElementById('logs-tbody');
+    if (!data.success || !data.loglar.length) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="5">Kayıt bulunamadı</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.loglar.map(l => `
+      <tr>
+        <td style="color:var(--text-muted);font-size:11px">#${l.id}</td>
+        <td><strong>${escHtml(l.ad_soyad)}</strong></td>
+        <td>${escHtml(l.ogrenci_no)}</td>
+        <td>${logBadge(l.islem_turu)}</td>
+        <td>${formatDate(l.tarih_saat)}</td>
+      </tr>
+    `).join('');
+  } catch {}
+}
+
+// ══════════════════════════════════════
+// LIVE
+// ══════════════════════════════════════
+function addLiveItem(item) {
+  const feed = document.getElementById('live-feed');
+  if (liveEmpty) {
+    feed.innerHTML = '';
+    liveEmpty = false;
+  }
+
+  const isGiris = item.islem_turu === 'GİRİŞ';
+  const initials = item.ad_soyad.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+
+  const div = document.createElement('div');
+  div.className = 'live-item';
+  div.innerHTML = `
+    <div class="live-avatar ${isGiris ? 'giris' : 'cikis'}">${initials}</div>
+    <div class="live-info">
+      <strong>${escHtml(item.ad_soyad)}</strong>
+      <span>No: ${escHtml(item.ogrenci_no)} • ${isGiris ? '🟢 Okula Giriş' : '🔴 Okuldan Çıkış'}</span>
+    </div>
+    <div class="live-time">${formatTime(item.tarih_saat)}</div>
+  `;
+  feed.insertBefore(div, feed.firstChild);
+
+  // Max 50 öğe
+  while (feed.children.length > 50) feed.removeChild(feed.lastChild);
+
+  refreshLiveStats();
+}
+
+async function refreshLiveStats() {
+  try {
+    const data = await apiFetch('/api/admin/dashboard');
+    if (data.success) {
+      document.getElementById('live-okulda').textContent = data.stats.okulda;
+      document.getElementById('live-disarida').textContent = data.stats.disarida;
+    }
+  } catch {}
+}
+
+function clearLiveFeed() {
+  document.getElementById('live-feed').innerHTML = `
+    <div style="text-align:center;padding:40px;color:var(--text-muted)">
+      <div style="font-size:36px;margin-bottom:12px">📡</div>
+      <p style="font-size:13px">Akış temizlendi. Yeni işlemler burada görünecek.</p>
+    </div>`;
+  liveEmpty = true;
+}
+
+// ══════════════════════════════════════
+// NOTIFICATIONS
+// ══════════════════════════════════════
+function toggleStudentSelect() {
+  const tur = document.getElementById('notif-tur').value;
+  document.getElementById('ozel-ogrenci-group').style.display = tur === 'ozel' ? 'flex' : 'none';
+}
+
+function populateStudentSelect(students) {
+  const sel = document.getElementById('notif-ogrenci-id');
+  sel.innerHTML = '<option value="">Öğrenci seçin...</option>';
+  students.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.id;
+    opt.textContent = `${s.ad_soyad} (${s.ogrenci_no})`;
+    sel.appendChild(opt);
+  });
+}
+
+async function gonderimiGonder() {
+  const baslik = document.getElementById('notif-baslik').value.trim();
+  const icerik = document.getElementById('notif-icerik').value.trim();
+  const tur = document.getElementById('notif-tur').value;
+  const ogrenciId = tur === 'ozel' ? document.getElementById('notif-ogrenci-id').value : null;
+  const alertEl = document.getElementById('notif-alert');
+
+  if (!baslik || !icerik) { showAlert(alertEl, 'Başlık ve içerik gerekli.', 'error'); return; }
+  if (tur === 'ozel' && !ogrenciId) { showAlert(alertEl, 'Öğrenci seçiniz.', 'error'); return; }
+
+  try {
+    const data = await apiFetch('/api/admin/bildirim-gonder', 'POST', {
+      baslik, icerik,
+      hedef_ogrenci_id: ogrenciId ? parseInt(ogrenciId) : null
+    });
+    if (data.success) {
+      showAlert(alertEl, 'Bildirim başarıyla gönderildi! ✅', 'success');
+      document.getElementById('notif-baslik').value = '';
+      document.getElementById('notif-icerik').value = '';
+      loadNotifications();
+    } else {
+      showAlert(alertEl, data.message, 'error');
+    }
+  } catch {
+    showAlert(alertEl, 'Sunucu hatası.', 'error');
+  }
+}
+
+async function loadNotifications() {
+  // Admin tarafında bildirim listesi için basit bir yaklaşım
+  // Tüm bildirimleri DB'den çekmek için bir endpoint yoktu, dashboard'daki son işlemlerden gösteriyoruz
+  // Şimdi basit bir şekilde gösterelim
+  const container = document.getElementById('sent-notifs');
+  container.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">Bildirimler yükleniyor...</div>';
+
+  try {
+    // Öğrenci token'ı olmadığı için admin olarak kontrol edemeyiz
+    // Bunun yerine son bildirimleri bir başka yolla göstereceğiz - basit placeholder
+    container.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">📋 Gönderilen bildirimler öğrenci tarafında görüntülenir.</div>';
+  } catch {}
+}
+
+// ══════════════════════════════════════
+// SETTINGS
+// ══════════════════════════════════════
+async function sifreDegistir() {
+  const eski = document.getElementById('eski-sifre').value;
+  const yeni = document.getElementById('yeni-sifre').value;
+  const yeni2 = document.getElementById('yeni-sifre2').value;
+  const alertEl = document.getElementById('settings-alert');
+
+  if (!eski || !yeni || !yeni2) { showAlert(alertEl, 'Tüm alanları doldurunuz.', 'error'); return; }
+  if (yeni !== yeni2) { showAlert(alertEl, 'Yeni şifreler eşleşmiyor.', 'error'); return; }
+  if (yeni.length < 6) { showAlert(alertEl, 'Yeni şifre en az 6 karakter olmalı.', 'error'); return; }
+
+  try {
+    const data = await apiFetch('/api/admin/sifre-degistir', 'POST', { eski_sifre: eski, yeni_sifre: yeni });
+    if (data.success) {
+      showAlert(alertEl, 'Şifre başarıyla güncellendi!', 'success');
+      document.getElementById('eski-sifre').value = '';
+      document.getElementById('yeni-sifre').value = '';
+      document.getElementById('yeni-sifre2').value = '';
+    } else {
+      showAlert(alertEl, data.message, 'error');
+    }
+  } catch {
+    showAlert(alertEl, 'Sunucu hatası.', 'error');
+  }
+}
+
+// ══════════════════════════════════════
+// SOCKET
+// ══════════════════════════════════════
+function connectSocket() {
+  socket = io();
+  socket.emit('join-admin');
+
+  socket.on('connect', () => {
+    document.getElementById('socket-status').textContent = 'Bağlı';
+    document.getElementById('socket-status').style.background = '#dcfce7';
+    document.getElementById('socket-status').style.color = '#166534';
+  });
+
+  socket.on('disconnect', () => {
+    document.getElementById('socket-status').textContent = 'Bağlantı Kesildi';
+    document.getElementById('socket-status').style.background = '#fee2e2';
+    document.getElementById('socket-status').style.color = '#991b1b';
+  });
+
+  socket.on('yeni-islem', (item) => {
+    addLiveItem(item);
+    // Dashboard'u da güncelle
+    if (document.getElementById('panel-dashboard').classList.contains('active')) {
+      loadDashboard();
+    }
+  });
+}
+
+// ══════════════════════════════════════
+// MODAL HELPERS
+// ══════════════════════════════════════
+function openModal(id) {
+  document.getElementById(id).classList.add('show');
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('show');
+  document.getElementById('add-student-btn').disabled = false;
+  document.getElementById('add-student-btn').innerHTML = `
+    <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+    Kaydet`;
+}
+
+// Overlay tıklayınca kapat
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) overlay.classList.remove('show');
+  });
+});
+
+// ══════════════════════════════════════
+// UTILS
+// ══════════════════════════════════════
+function showAlert(el, msg, type) {
+  el.textContent = msg;
+  el.className = `alert alert-${type} show`;
+  setTimeout(() => el.classList.remove('show'), 4000);
+}
+
+function logBadge(turu) {
+  if (turu === 'GİRİŞ') return '<span class="badge badge-success"><span class="badge-dot"></span>Giriş</span>';
+  return '<span class="badge badge-danger"><span class="badge-dot"></span>Çıkış</span>';
+}
+
+function formatDate(str) {
+  if (!str) return '';
+  const d = new Date(str.replace(' ', 'T'));
+  return d.toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function formatDateShort(str) {
+  if (!str) return '';
+  const d = new Date(str.replace(' ', 'T'));
+  return d.toLocaleDateString('tr-TR');
+}
+
+function formatTime(str) {
+  if (!str) return '';
+  const d = new Date(str.replace(' ', 'T'));
+  return d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>
